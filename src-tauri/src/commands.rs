@@ -18,17 +18,20 @@ pub fn ping() -> String {
 // Ollama liveness / model helpers
 // ---------------------------------------------------------------------------
 
+// Ollama liveness is "ensure" semantics, not a passive probe: end users
+// shouldn't know what Ollama is, so a stopped server is started on demand.
 #[tauri::command]
 #[specta::specta]
 pub async fn check_ollama() -> Result<crate::ollama::VersionResponse, String> {
     let client = crate::ollama::OllamaClient::default_local();
-    client.version().await.map_err(|e| e.to_string())
+    client.ensure_running().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn list_models() -> Result<crate::ollama::TagsResponse, String> {
     let client = crate::ollama::OllamaClient::default_local();
+    client.ensure_running().await.map_err(|e| e.to_string())?;
     client.tags().await.map_err(|e| e.to_string())
 }
 
@@ -36,6 +39,7 @@ pub async fn list_models() -> Result<crate::ollama::TagsResponse, String> {
 #[specta::specta]
 pub async fn check_model_installed(model: String) -> Result<bool, String> {
     let client = crate::ollama::OllamaClient::default_local();
+    client.ensure_running().await.map_err(|e| e.to_string())?;
     let tags = client.tags().await.map_err(|e| e.to_string())?;
     Ok(tags.models.iter().any(|m| m.name == model))
 }
@@ -45,6 +49,7 @@ pub async fn check_model_installed(model: String) -> Result<bool, String> {
 #[specta::specta]
 pub async fn pull_model(app: AppHandle, model: String) -> Result<(), String> {
     let client = crate::ollama::OllamaClient::default_local();
+    client.ensure_running().await.map_err(|e| e.to_string())?;
     client
         .pull(&model, |prog| {
             let _ = app.emit("quill://pull-progress", &prog);
@@ -75,12 +80,16 @@ pub async fn run_action(
     } else {
         model
     };
+    client
+        .ensure_running()
+        .await
+        .map_err(|e| crate::shortcut::friendly_chat_error(&e))?;
     let result = client
         .chat(&chosen_model, parsed.prompt(), &text)
         .await
         .map_err(|e| match e {
             crate::ollama::OllamaError::NotRunning { message } => {
-                format!("Ollama isn't running. {message} — Install / Retry")
+                format!("Couldn't start the local AI engine. {message}")
             }
             crate::ollama::OllamaError::ModelNotFound { model } => {
                 format!("That model isn't downloaded yet: {model} — Download with progress")

@@ -30,7 +30,7 @@ export function OllamaCheck({ onReady }: Props) {
   const handleRetry = async () => {
     const ok = await runCheck();
     if (ok) onReady();
-    else toast.error("Ollama still not running");
+    else toast.error("Still couldn't start the local AI engine");
   };
 
   const handleContinue = async () => {
@@ -50,7 +50,7 @@ export function OllamaCheck({ onReady }: Props) {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Checking for Ollama… (GET /api/version, 1.5s timeout)</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">Checking the local AI engine… (it starts automatically if needed)</p>
       </div>
     );
   }
@@ -70,9 +70,10 @@ export function OllamaCheck({ onReady }: Props) {
         <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
           <div className="space-y-1">
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Ollama isn't running.</p>
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-100">We couldn't start the local AI engine automatically.</p>
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              Quill needs Ollama to run local models. Install it, then come back and hit Retry.
+              Quill runs models through Ollama on your Mac. Install it (free), then hit Retry —
+              Quill starts it for you from then on.
             </p>
             {error && <p className="text-xs text-amber-700 dark:text-amber-300">{error}</p>}
           </div>
@@ -92,8 +93,6 @@ export function OllamaCheck({ onReady }: Props) {
             <RefreshCw className="h-4 w-4" /> Retry
           </Button>
         </div>
-
-        <p className="text-xs text-zinc-500">Probe: GET http://127.0.0.1:11434/api/version — 1.5s timeout.</p>
       </div>
     );
   }
@@ -104,7 +103,7 @@ export function OllamaCheck({ onReady }: Props) {
         <CheckCircle2 className="h-5 w-5" />
         <span className="text-sm font-medium">Ollama is running</span>
       </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">We found Ollama via GET /api/version. Next, pick a model.</p>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">The local AI engine is running. Next, pick a model.</p>
       <Button onClick={handleContinue} variant="primary" className="self-start">
         Continue
       </Button>

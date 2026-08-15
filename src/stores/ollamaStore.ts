@@ -11,6 +11,11 @@ export const MODEL_OPTIONS = [
 
 const OLLAMA_HOST = "http://127.0.0.1:11434";
 
+/** False in plain `vite` browser dev, where invoke isn't available. */
+function inTauri(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
 export type PullProgress = {
   status: string;
   digest: string;
@@ -77,45 +82,61 @@ export const useOllamaStore = create<OllamaState>((set, get) => ({
   setRecommendedModel: (m) => set({ recommendedModel: m }),
   reset: () => set({ status: "idle", pullProgress: null, error: null }),
 
-  // Liveness probe — GET /api/version with 1.5s timeout per PLAN §10 Phase 2
+  // Liveness with auto-start: in the app the Rust side probes /api/version
+  // and, if the server is down, launches `ollama serve` and waits for it —
+  // users never have to know what Ollama is. Browser dev keeps a passive probe.
   checkOllama: async () => {
     set({ status: "checking", error: null });
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 1500);
+    if (!inTauri()) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 1500);
+      try {
+        const res = await fetch(`${OLLAMA_HOST}/api/version`, {
+          method: "GET",
+          signal: ctrl.signal,
+        });
+        clearTimeout(t);
+        if (!res.ok) throw new Error(`version ${res.status}`);
+        set({ status: "available", isAvailable: true, checked: true });
+        return true;
+      } catch (e) {
+        clearTimeout(t);
+        const msg = e instanceof Error ? e.message : String(e);
+        set({ status: "missing", isAvailable: false, checked: true, error: msg });
+        return false;
+      }
+    }
     try {
-      const res = await fetch(`${OLLAMA_HOST}/api/version`, {
-        method: "GET",
-        signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      if (!res.ok) throw new Error(`version ${res.status}`);
-      set({ status: "available", isAvailable: true, checked: true });
+      const res = await commands.checkOllama();
+      if (res.status === "error") throw new Error(res.error);
+      set({ status: "available", isAvailable: true, checked: true, error: null });
       return true;
     } catch (e) {
-      clearTimeout(t);
       const msg = e instanceof Error ? e.message : String(e);
-      const isAbort = msg.toLowerCase().includes("abort");
-      set({
-        status: "missing",
-        isAvailable: false,
-        checked: true,
-        error: isAbort ? "Ollama isn't running (timeout 1.5s)." : `Ollama isn't running: ${msg}`,
-      });
+      set({ status: "missing", isAvailable: false, checked: true, error: msg });
       return false;
     }
   },
 
-  // GET /api/tags — list pulled models
+  // Installed models — via Rust in the app (which also starts the server if
+  // needed), plain fetch in browser dev.
   fetchTags: async () => {
     try {
-      const res = await fetch(`${OLLAMA_HOST}/api/tags`, { method: "GET" });
-      if (!res.ok) throw new Error(`tags ${res.status}`);
-      const data = (await res.json()) as { models?: { name: string }[] };
-      const names = (data.models ?? []).map((m) => m.name);
+      let names: string[];
+      if (inTauri()) {
+        const res = await commands.listModels();
+        if (res.status === "error") throw new Error(res.error);
+        names = res.data.models.map((m) => m.name);
+      } else {
+        const res = await fetch(`${OLLAMA_HOST}/api/tags`, { method: "GET" });
+        if (!res.ok) throw new Error(`tags ${res.status}`);
+        const data = (await res.json()) as { models?: { name: string }[] };
+        names = (data.models ?? []).map((m) => m.name);
+      }
       set({ installedModels: names });
       // try hardware recommendation from Rust if available
       try {
-        const rec = await (commands as unknown as { getRecommendedModel: () => Promise<string> }).getRecommendedModel();
+        const rec = await commands.getRecommendedModel();
         if (rec) set({ recommendedModel: rec, selectedModel: get().selectedModel || rec });
       } catch {
         // keep default qwen3.5:4b
@@ -127,18 +148,13 @@ export const useOllamaStore = create<OllamaState>((set, get) => ({
     }
   },
 
-  // Liveness + installed models in one call. Retries because with launch-at-login
-  // Quill can start before Ollama's daemon is listening — a single probe would
-  // false-negative exactly when the user just opened the app.
+  // Liveness (with auto-start) + installed models in one call. The Rust side
+  // polls while the server boots, so a single pass covers the launch-at-login
+  // race that used to need retries.
   refresh: async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
-      if (await get().checkOllama()) {
-        await get().fetchTags();
-        return true;
-      }
-    }
-    return false;
+    if (!(await get().checkOllama())) return false;
+    await get().fetchTags();
+    return true;
   },
 
   // POST /api/pull streaming NDJSON — {status, digest, total, completed} per line

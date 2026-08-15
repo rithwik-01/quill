@@ -182,12 +182,14 @@ fn handle_hotkey_pressed(app: &AppHandle) {
         }
         let _ = app_handle.emit("quill://popup-text", &text);
 
-        // 3. Check Ollama liveness for a fast, friendly error
+        // 3. Ensure Ollama is up — start it ourselves if needed; end users
+        // shouldn't have to know what Ollama is. Adds a few seconds of latency
+        // only when the server was down.
         let settings = crate::settings::load_settings_snapshot(&app_handle);
         let client = crate::ollama::OllamaClient::default_local();
-        if let Err(e) = client.version().await {
-            log::error!("ollama not running: {e}");
-            let msg = format!("Ollama isn't running — start Ollama and try again. ({e})");
+        if let Err(e) = client.ensure_running().await {
+            log::error!("ollama unavailable: {e}");
+            let msg = friendly_chat_error(&e);
             let _ = app_handle.emit("quill://popup-error", &msg);
             let _ = app_handle.emit("quill://error", &msg);
             return;
@@ -215,7 +217,7 @@ fn handle_hotkey_pressed(app: &AppHandle) {
 pub fn friendly_chat_error(e: &crate::ollama::OllamaError) -> String {
     match e {
         crate::ollama::OllamaError::NotRunning { message } => {
-            format!("Ollama isn't running. {message}")
+            format!("Couldn't start the local AI engine. {message}")
         }
         crate::ollama::OllamaError::ModelNotFound { model } => {
             format!("That model isn't downloaded yet: {model}")

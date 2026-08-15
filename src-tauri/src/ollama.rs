@@ -6,6 +6,8 @@ pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
 pub const VERSION_TIMEOUT: Duration = Duration::from_millis(1500);
 pub const CHAT_TIMEOUT: Duration = Duration::from_secs(60);
 pub const TAGS_TIMEOUT: Duration = Duration::from_secs(10);
+pub const STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(400);
+pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
 // Typed errors (§11)
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -140,6 +142,39 @@ impl OllamaClient {
         }
         resp.json::<VersionResponse>().await.map_err(|e| OllamaError::Transport {
             message: e.to_string(),
+        })
+    }
+    /// Probe the server; if unreachable, launch `ollama serve` ourselves and
+    /// wait for it to come up. End users shouldn't need to know what Ollama
+    /// is, so Quill owns starting it.
+    pub async fn ensure_running(&self) -> Result<VersionResponse, OllamaError> {
+        if let Ok(v) = self.version().await {
+            return Ok(v);
+        }
+        let Some(bin) = find_ollama_binary() else {
+            return Err(OllamaError::NotRunning {
+                message: "Ollama doesn't appear to be installed on this machine".into(),
+            });
+        };
+        // Serialize the spawn itself (refresh + hotkey can race). No await is
+        // held across the guard, so the future stays Send. A redundant spawn is
+        // harmless: the second `serve` exits when the port is already taken.
+        {
+            static LAUNCH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+            let _guard = LAUNCH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            log::info!("ollama unreachable — launching '{} serve'", bin.display());
+            spawn_ollama_serve(&bin)?;
+        }
+        let started = std::time::Instant::now();
+        while started.elapsed() < STARTUP_TIMEOUT {
+            tokio::time::sleep(STARTUP_POLL_INTERVAL).await;
+            if let Ok(v) = self.version().await {
+                log::info!("ollama up after {:.1}s", started.elapsed().as_secs_f32());
+                return Ok(v);
+            }
+        }
+        Err(OllamaError::NotRunning {
+            message: "Ollama was launched but didn't respond within 15s".into(),
         })
     }
     pub async fn tags(&self) -> Result<TagsResponse, OllamaError> {
@@ -322,6 +357,60 @@ impl OllamaClient {
         Ok(())
     }
 }
+// Auto-start helpers. GUI apps get a minimal PATH (/usr/bin:/bin:…), so known
+// install locations are checked explicitly before falling back to a PATH scan.
+pub fn ollama_binary_candidates() -> Vec<std::path::PathBuf> {
+    let mut v = Vec::new();
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = std::env::var_os("HOME") {
+            v.push(std::path::PathBuf::from(home).join(".local/bin/ollama"));
+        }
+        v.push(std::path::PathBuf::from("/opt/homebrew/bin/ollama"));
+        v.push(std::path::PathBuf::from("/usr/local/bin/ollama"));
+        v.push(std::path::PathBuf::from(
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+        ));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        v.push(std::path::PathBuf::from(
+            r"C:\Program Files\Ollama\ollama.exe",
+        ));
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            v.push(std::path::PathBuf::from(local).join(r"Programs\Ollama\ollama.exe"));
+        }
+    }
+    if let Some(paths) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&paths) {
+            #[cfg(target_os = "windows")]
+            let candidate = dir.join("ollama.exe");
+            #[cfg(not(target_os = "windows"))]
+            let candidate = dir.join("ollama");
+            v.push(candidate);
+        }
+    }
+    v
+}
+
+pub fn find_ollama_binary() -> Option<std::path::PathBuf> {
+    ollama_binary_candidates().into_iter().find(|p| p.is_file())
+}
+
+fn spawn_ollama_serve(bin: &std::path::Path) -> Result<(), OllamaError> {
+    use std::process::{Command, Stdio};
+    Command::new(bin)
+        .arg("serve")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| OllamaError::NotRunning {
+            message: format!("failed to launch Ollama ({}): {e}", bin.display()),
+        })
+}
+
 // NDJSON parser
 #[derive(Debug, Default)]
 pub struct NdjsonBuffer {

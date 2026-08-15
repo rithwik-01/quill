@@ -39,9 +39,17 @@ export function ModelSettings() {
     try {
       const ok = await refresh();
       if (ok) toast.success("Model list refreshed");
-      else toast.error("Could not reach Ollama");
+      else toast.error("Couldn't start the local AI engine");
     } finally {
       setCheckingModels(false);
+    }
+  };
+
+  const openInstall = async () => {
+    try {
+      await commands.openUrl("https://ollama.com/download");
+    } catch {
+      window.open("https://ollama.com/download", "_blank");
     }
   };
 
@@ -106,16 +114,22 @@ export function ModelSettings() {
             size="sm"
             onClick={() => void handleRefreshModels()}
             loading={checkingModels}
-            title="Refresh from GET /api/tags"
+            title="Refresh models — starts the local engine if needed"
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
 
         {!checked ? (
-          <p className="mt-2 text-xs text-zinc-500">Checking Ollama…</p>
+          <p className="mt-2 text-xs text-zinc-500">Checking the local AI engine…</p>
         ) : !isAvailable ? (
-          <p className="mt-2 text-xs text-amber-600">Ollama isn't running — start it, then hit refresh.</p>
+          <p className="mt-2 text-xs text-amber-600">
+            Couldn't start the local AI engine on this Mac.{" "}
+            <button className="underline hover:text-amber-700" onClick={() => void openInstall()}>
+              Install Ollama
+            </button>{" "}
+            if it's missing, then hit refresh.
+          </p>
         ) : installed ? (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
             <CheckCircle2 className="h-3.5 w-3.5" /> {settings.model} is downloaded and active
