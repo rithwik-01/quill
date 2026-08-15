@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { commands } from "../bindings";
-import { DiffText } from "./DiffText";
+import { DiffText } from "../components/ui";
 
 // Canonical action ids accepted by Rust parse_action (commands.rs)
 const ACTIONS = [
@@ -286,7 +286,7 @@ export function Popup() {
                     Original
                   </button>
                   {showOriginal && (
-                    <p className="whitespace-pre-wrap px-2.5 pb-2 text-xs leading-relaxed text-zinc-500 line-through decoration-zinc-300 dark:text-zinc-400 dark:decoration-zinc-600">
+                    <p className="whitespace-pre-wrap px-2.5 pb-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
                       {original}
                     </p>
                   )}

@@ -1,7 +1,17 @@
 import * as React from "react";
-import { History, Copy, Trash2, Check, Loader2, Eraser } from "lucide-react";
+import {
+  History,
+  Copy,
+  Trash2,
+  Check,
+  Loader2,
+  Eraser,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useHistoryStore } from "../../stores/historyStore";
+import { DiffText } from "../ui";
 import type { HistoryEntry } from "../../bindings";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -115,6 +125,7 @@ export function HistorySettings() {
 
 function EntryCard({ entry, onRemove }: { entry: HistoryEntry; onRemove: () => void }) {
   const [expanded, setExpanded] = React.useState(false);
+  const [showOriginal, setShowOriginal] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
 
   const handleCopy = async () => {
@@ -157,17 +168,31 @@ function EntryCard({ entry, onRemove }: { entry: HistoryEntry; onRemove: () => v
       </div>
 
       <button onClick={() => setExpanded((s) => !s)} className="block w-full text-left">
-        <p
-          className={`text-xs leading-relaxed text-zinc-400 line-through decoration-zinc-300 dark:decoration-zinc-600 ${expanded ? "" : "line-clamp-1"}`}
-        >
-          {entry.original_text}
-        </p>
-        <p
-          className={`mt-1 text-sm leading-relaxed text-zinc-800 dark:text-zinc-100 ${expanded ? "whitespace-pre-wrap" : "line-clamp-3"}`}
-        >
-          {entry.result_text}
-        </p>
+        <div className={expanded ? "" : "line-clamp-3"}>
+          <DiffText original={entry.original_text} result={entry.result_text} />
+        </div>
       </button>
+
+      {expanded && (
+        <div className="mt-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60">
+          <button
+            onClick={() => setShowOriginal((s) => !s)}
+            className="flex w-full items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-zinc-500"
+          >
+            {showOriginal ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            Original
+          </button>
+          {showOriginal && (
+            <p className="whitespace-pre-wrap px-2.5 pb-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              {entry.original_text}
+            </p>
+          )}
+        </div>
+      )}
 
       {entry.refinements.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">

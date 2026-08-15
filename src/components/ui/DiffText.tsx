@@ -19,7 +19,7 @@ export function DiffText({ original, result }: { original: string; result: strin
               {c.value}
             </span>
           );
-       	}
+        }
         if (c.added) {
           return (
             <span
@@ -29,7 +29,7 @@ export function DiffText({ original, result }: { original: string; result: strin
               {c.value}
             </span>
           );
-       	}
+        }
         return <span key={i}>{c.value}</span>;
       })}
     </p>
