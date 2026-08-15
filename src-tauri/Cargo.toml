@@ -1,0 +1,64 @@
+[package]
+name = "quill"
+version = "0.1.0"
+description = "Quill — local text rewriting via hotkey"
+authors = ["Quill"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-store = "2.4"
+tauri-plugin-global-shortcut = "2.3"
+tauri-plugin-clipboard-manager = "2.3"
+tauri-plugin-opener = "2.5"
+tauri-plugin-os = "2.3"
+tauri-plugin-process = "2.3"
+tauri-plugin-log = "2.7"
+tauri-plugin-autostart = "2.5"
+tauri-plugin-updater = "2.10"
+tauri-plugin-single-instance = "2.3"
+
+# Pinned exactly — these two RC versions are known to work together (Handy ships them)
+specta = "=2.0.0-rc.22"
+specta-typescript = "0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+
+enigo = "0.6.1"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+sysinfo = "0.32"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+log = "0.4"
+futures-util = "0.3"
+core-foundation = "0.9"
+
+# History — same crates/versions Handy ships (Handy src-tauri/Cargo.toml:46,72)
+rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite_migration = "2.3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Frontmost-app capture/restore for the popup Accept flow (PLAN §7)
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util", "sync"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

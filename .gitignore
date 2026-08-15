@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+bun.lockb
+package-lock.json
+
+# Build
+dist/
+src-tauri/target/
+src-tauri/gen/schemas
+
+# Env
+.env
+.env.local
+
+# Personal planning notes — local only
+PLAN.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
