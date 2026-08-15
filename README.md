@@ -10,7 +10,7 @@
 
 ## Features
 
-- **Hotkey popup** — select text, press `Cmd/Ctrl+Shift+.` (rebindable), and Quill opens a popup near your cursor with the fix
+- **Hotkey popup** — select text, press `Cmd/Ctrl+Shift+G` (rebindable), and Quill opens a popup near your cursor with the fix
 - **Actions** — Fix Grammar, Improve, Shorten, Simplify
 - **Inline diff** — changes shown as a word-level diff against the original
 - **Refine chat** — ask for changes in plain language ("make it more formal") and the result updates in place
@@ -21,18 +21,30 @@
 
 ```mermaid
 flowchart LR
-  A["Any app<br/>(selected text)"] -->|hotkey| R
-  subgraph Q["Quill · Tauri 2"]
-    R["Rust core<br/>hotkey · selection · paste"]
-    P["Popup webview<br/>diff · refine chat"]
-    M["Main window<br/>settings · history"]
-    DB[("SQLite")]
+  A["📝 Any app<br/>selected text"] -->|"⌘/Ctrl+Shift+G"| R
+  subgraph Q["🪶 Quill · Tauri 2"]
+    R["⚙️ Rust core<br/>hotkey · selection · paste"]
+    P["💬 Popup webview<br/>diff · refine chat"]
+    M["🛠️ Main window<br/>settings · history"]
+    DB[("🗃️ SQLite history")]
   end
-  R <-->|"/api/chat · local only"| O["Ollama<br/>qwen3.5"]
+  R <-->|"/api/chat · local only"| O["🦙 Ollama<br/>qwen3.5"]
   R <--> P
   R <--> M
   R <--> DB
-  R -->|paste back| A
+  R -->|"✅ paste back"| A
+
+  classDef app  fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a8a
+  classDef core fill:#ffedd5,stroke:#f97316,stroke-width:1.5px,color:#7c2d12
+  classDef ui   fill:#ede9fe,stroke:#8b5cf6,stroke-width:1.5px,color:#4c1d95
+  classDef db   fill:#dcfce7,stroke:#22c55e,stroke-width:1.5px,color:#14532d
+  classDef ai   fill:#fef9c3,stroke:#eab308,stroke-width:1.5px,color:#713f12
+
+  class A app
+  class R core
+  class P,M ui
+  class DB db
+  class O ai
 ```
 
 1. The hotkey handler (Rust) captures your selection and remembers the source app.
@@ -62,4 +74,15 @@ cd src-tauri && cargo test   # Rust unit tests (incl. a mock-Ollama server suite
 
 ## Stack
 
-Tauri 2 · React 18 + TypeScript + Vite + Tailwind 4 · Zustand · Ollama `/api/chat` (`think: false`) · SQLite (rusqlite)
+<p>
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri_2-FFC131?logo=tauri&logoColor=black" />
+  <img alt="React 18" src="https://img.shields.io/badge/React_18-61DAFB?logo=react&logoColor=black" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" />
+  <img alt="Tailwind 4" src="https://img.shields.io/badge/Tailwind_4-06B6D4?logo=tailwindcss&logoColor=white" />
+  <img alt="Zustand" src="https://img.shields.io/badge/Zustand-1D1D1D" />
+  <img alt="Ollama" src="https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" />
+</p>
+
+Ollama `/api/chat` with `think: false` · settings + history stored locally, never leave the machine.
