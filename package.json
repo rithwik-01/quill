@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:sign": "sh scripts/sign-dev.sh",
-    "release:mac": "sh scripts/release-mac.sh"
+    "release:mac": "sh scripts/release-mac.sh",
+    "icons": "sh scripts/gen-icons.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",
