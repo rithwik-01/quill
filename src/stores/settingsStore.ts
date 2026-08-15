@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { commands } from "../bindings";
 
 // Settings mirrors src-tauri/src/settings.rs — persisted via tauri-plugin-store (JSON file).
-// Default model qwen3.5:4b per PLAN §8; hotkey Cmd+Shift+. / Ctrl+Shift+. per §6.
+// Default model qwen3.5:4b per PLAN §8; hotkey Cmd+Shift+G / Ctrl+Shift+G.
 export type Settings = {
   model: string;
   hotkey: string;
@@ -10,7 +10,7 @@ export type Settings = {
   onboardingComplete: boolean;
 };
 
-export const CANONICAL_HOTKEY = "CommandOrControl+Shift+Period";
+export const CANONICAL_HOTKEY = "CommandOrControl+Shift+G";
 const DEFAULT_SETTINGS: Settings = {
   model: "qwen3.5:4b",
   hotkey: CANONICAL_HOTKEY,

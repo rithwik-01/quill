@@ -14,7 +14,7 @@ export function Onboarding({ onFinished }: { onFinished?: () => void }) {
 
   const finish = async () => {
     await setOnboardingComplete(true);
-    toast.success("Quill is ready — select text in any app and press your hotkey (default Cmd+Shift+.)");
+    toast.success("Quill is ready — select text in any app and press your hotkey (default Cmd+Shift+G)");
     onFinished?.();
   };
 

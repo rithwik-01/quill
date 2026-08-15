@@ -119,7 +119,7 @@ export function GeneralSettings() {
             </>
           )}
         </div>
-        <p className="mt-2 text-xs text-zinc-500">Default: Cmd+Shift+. / Ctrl+Shift+.</p>
+        <p className="mt-2 text-xs text-zinc-500">Default: Cmd+Shift+G / Ctrl+Shift+G</p>
       </section>
 
       <AccessibilityCard />

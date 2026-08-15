@@ -25,13 +25,19 @@ function keyEvent(e: {
 }
 
 test("records the default hotkey on both platforms", () => {
-  // macOS: Cmd+Shift+.
+  // macOS: Cmd+Shift+G
+  expect(
+    formatHotkey(keyEvent({ key: "g", code: "KeyG", metaKey: true, shiftKey: true })),
+  ).toBe("CommandOrControl+Shift+G");
+  // Windows/Linux: Ctrl+Shift+G
+  expect(
+    formatHotkey(keyEvent({ key: "g", code: "KeyG", ctrlKey: true, shiftKey: true })),
+  ).toBe("CommandOrControl+Shift+G");
+});
+
+test("still canonicalizes the legacy period hotkey", () => {
   expect(
     formatHotkey(keyEvent({ key: ".", code: "Period", metaKey: true, shiftKey: true })),
-  ).toBe("CommandOrControl+Shift+Period");
-  // Windows/Linux: Ctrl+Shift+.
-  expect(
-    formatHotkey(keyEvent({ key: ".", code: "Period", ctrlKey: true, shiftKey: true })),
   ).toBe("CommandOrControl+Shift+Period");
 });
 

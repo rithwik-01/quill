@@ -44,6 +44,9 @@ beforeEach(() => {
 
 test("normalizeHotkey canonicalizes legacy spellings like the Rust side", () => {
   const parity: Array<[string, string]> = [
+    // the current default
+    ["CmdOrCtrl+Shift+G", "CommandOrControl+Shift+G"],
+    // legacy default spellings still canonicalize
     ["CmdOrCtrl+Shift+.", "CommandOrControl+Shift+Period"],
     ["CommandOrControl+Shift+.", "CommandOrControl+Shift+Period"],
     ["Ctrl+Shift+.", "Control+Shift+Period"],

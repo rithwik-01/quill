@@ -7,11 +7,11 @@
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-pub const DEFAULT_HOTKEY: &str = "CommandOrControl+Shift+Period";
+pub const DEFAULT_HOTKEY: &str = "CommandOrControl+Shift+G";
 
 /// Canonicalize all hotkey spellings the JS UI might produce.
 /// Handles: Cmd/Ctrl/CmdOrCtrl/CommandOrControl, "." ↔ Period, spacing, case.
-/// The stored value is always `CommandOrControl+Shift+Period` so parsing is stable.
+/// The stored value is always `CommandOrControl+Shift+G` so parsing is stable.
 pub fn normalize_hotkey(s: &str) -> String {
     let trimmed = s.trim();
     if trimmed.is_empty() {
@@ -285,6 +285,9 @@ mod tests {
     #[test]
     fn normalize_parity_with_frontend() {
         let cases: &[(&str, &str)] = &[
+            // the current default
+            ("CmdOrCtrl+Shift+G", "CommandOrControl+Shift+G"),
+            // legacy default spellings still canonicalize
             ("CmdOrCtrl+Shift+.", "CommandOrControl+Shift+Period"),
             ("CommandOrControl+Shift+.", "CommandOrControl+Shift+Period"),
             ("Ctrl+Shift+.", "Control+Shift+Period"),

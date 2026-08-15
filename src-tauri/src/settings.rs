@@ -38,7 +38,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             model: "qwen3.5:4b".to_string(),
-            hotkey: "CommandOrControl+Shift+Period".to_string(),
+            hotkey: "CommandOrControl+Shift+G".to_string(),
             launch_at_login: false,
             theme: Theme::System,
             onboarding_complete: false,
