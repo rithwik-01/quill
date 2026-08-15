@@ -21,7 +21,7 @@ const ACTION_LABELS: Record<string, string> = {
   simplify: "Simplify",
 };
 
-function formatTime(ts: number): string {
+export function formatTime(ts: number): string {
   const d = new Date(ts * 1000);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();

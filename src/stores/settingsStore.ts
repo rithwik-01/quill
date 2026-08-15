@@ -18,20 +18,32 @@ const DEFAULT_SETTINGS: Settings = {
   onboardingComplete: false,
 };
 
-// Normalize any legacy stored hotkey (e.g. CmdOrCtrl+Shift+.) to canonical
-function normalizeHotkey(hotkey: string): string {
-  if (!hotkey) return CANONICAL_HOTKEY;
-  // mirror Rust shortcut::normalize_hotkey — keep in sync
+// Normalize any legacy stored hotkey (e.g. CmdOrCtrl+Shift+.) to canonical.
+// Mirrors Rust shortcut::normalize_hotkey — keep in sync (parity is pinned by
+// settingsStore.test.ts and shortcut.rs tests).
+export function normalizeHotkey(hotkey: string): string {
+  const trimmed = hotkey.trim();
+  if (!trimmed) return CANONICAL_HOTKEY;
+  // Protect the canonical tokens so the Cmd/Ctrl aliases below don't mangle them
   const PH = "__CMDORCTRL__";
-  let h = hotkey.replace("CommandOrControl", PH).replace("CmdOrCtrl", PH);
-  h = h.replace("Cmd", "Command").replace(PH, "CommandOrControl");
-  h = h.replace("Ctrl", "Control");
-  // Fix double-replace artifact for CommandOrControl
-  h = h.replace("CommandOrControl", PH).replace("Control", "Control").replace(PH, "CommandOrControl");
+  let h = trimmed.replace(/CommandOrControl/g, PH).replace(/CmdOrCtrl/g, PH);
+  h = h.replace(/Cmd/g, "Command").replace(/Ctrl/g, "Control").replace(new RegExp(PH, "g"), "CommandOrControl");
+  const aliases: Record<string, string> = {
+    ".": "Period", ",": "Comma", "/": "Slash", ";": "Semicolon", "'": "Quote",
+    "[": "BracketLeft", "]": "BracketRight",
+    period: "Period", comma: "Comma", slash: "Slash", space: "Space",
+    enter: "Enter", return: "Enter",
+    ctrl: "Control", control: "Control",
+    cmd: "Command", command: "Command",
+    cmdorctrl: "CommandOrControl", commandorcontrol: "CommandOrControl",
+    alt: "Alt", option: "Alt",
+    shift: "Shift",
+    super: "Super", meta: "Super",
+  };
   const parts = h.split("+").map((p) => p.trim()).filter(Boolean).map((p) => {
-    if (p === ".") return "Period";
-    if (p.toLowerCase() === "period") return "Period";
-    return p;
+    if (aliases[p]) return aliases[p];
+    if (aliases[p.toLowerCase()]) return aliases[p.toLowerCase()];
+    return p.charAt(0).toUpperCase() + p.slice(1);
   });
   const joined = parts.join("+");
   return joined || CANONICAL_HOTKEY;

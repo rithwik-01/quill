@@ -7,7 +7,7 @@ import { AccessibilityCard } from "./AccessibilityCard";
 import { useSettingsStore, displayHotkey } from "../../stores/settingsStore";
 import { commands } from "../../bindings";
 
-function formatHotkey(e: React.KeyboardEvent): string | null {
+export function formatHotkey(e: React.KeyboardEvent): string | null {
   const mods: string[] = [];
   if (e.metaKey) mods.push("Command");
   if (e.ctrlKey) mods.push("Control");

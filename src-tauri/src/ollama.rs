@@ -489,4 +489,160 @@ mod tests {
         assert!(buf.push(b"{\"status\":\"last\"}").is_empty());
         assert_eq!(buf.finish().as_deref(), Some("{\"status\":\"last\"}"));
     }
+
+    // ---- loopback mock-Ollama tests -------------------------------------
+    // OllamaClient takes an injectable base_url, so point it at a one-shot
+    // HTTP server on 127.0.0.1 and exercise request/response handling end to
+    // end without needing a real Ollama process.
+
+    fn find_header_end(buf: &[u8]) -> Option<usize> {
+        buf.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4)
+    }
+
+    /// Serve one canned HTTP response on a fresh 127.0.0.1 port.
+    async fn serve_once(status: u16, body: &'static str) -> u16 {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind loopback");
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.expect("accept");
+            // Drain the full request (head + Content-Length body) so the
+            // client never sees a reset while still writing.
+            let mut buf = Vec::new();
+            let mut head_end: Option<usize> = None;
+            let mut content_length = 0usize;
+            loop {
+                let mut tmp = [0u8; 4096];
+                let n = sock.read(&mut tmp).await.unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+                if head_end.is_none() {
+                    if let Some(pos) = find_header_end(&buf) {
+                        let head = String::from_utf8_lossy(&buf[..pos]);
+                        for line in head.lines() {
+                            if let Some(v) = line
+                                .to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                            {
+                                content_length = v.trim().parse().unwrap_or(0);
+                            }
+                        }
+                        head_end = Some(pos);
+                    }
+                }
+                if let Some(pos) = head_end {
+                    if buf.len() >= pos + content_length {
+                        break;
+                    }
+                }
+            }
+            let reason = if (200..300).contains(&status) { "OK" } else { "Error" };
+            let resp = format!(
+                "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = sock.write_all(resp.as_bytes()).await;
+            let _ = sock.shutdown().await;
+        });
+        port
+    }
+
+    async fn chat_with(port: u16, content_user: &str) -> Result<String, OllamaError> {
+        let c = OllamaClient::new(format!("http://127.0.0.1:{port}"));
+        c.chat_messages(
+            "qwen3.5:4b",
+            vec![ChatMessage {
+                role: "user".into(),
+                content: content_user.into(),
+            }],
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn chat_parses_message_content_and_strips_preamble() {
+        let port = serve_once(
+            200,
+            r#"{"message":{"role":"assistant","content":"Here is the corrected text:\nFixed."},"done":true}"#,
+        )
+        .await;
+        assert_eq!(chat_with(port, "fx").await.unwrap(), "Fixed.");
+    }
+
+    #[tokio::test]
+    async fn chat_falls_back_to_response_field() {
+        // Older/alternate Ollama shapes put the text in `response`
+        let port = serve_once(200, r#"{"response":"Legacy shape","done":true}"#).await;
+        assert_eq!(chat_with(port, "hi").await.unwrap(), "Legacy shape");
+    }
+
+    #[tokio::test]
+    async fn chat_404_maps_to_model_not_found() {
+        let port = serve_once(404, r#"{"error":"model 'nope' not found"}"#).await;
+        let err = chat_with(port, "hi").await.unwrap_err();
+        match err {
+            OllamaError::ModelNotFound { model } => assert_eq!(model, "qwen3.5:4b"),
+            other => panic!("expected ModelNotFound, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn chat_empty_result_maps_to_empty_response() {
+        let port = serve_once(
+            200,
+            r#"{"message":{"role":"assistant","content":""},"done":true}"#,
+        )
+        .await;
+        let err = chat_with(port, "hi").await.unwrap_err();
+        assert!(matches!(err, OllamaError::EmptyResponse { .. }));
+    }
+
+    #[tokio::test]
+    async fn version_parses_json() {
+        let port = serve_once(200, r#"{"version":"0.13.0"}"#).await;
+        let c = OllamaClient::new(format!("http://127.0.0.1:{port}"));
+        assert_eq!(c.version().await.unwrap().version, "0.13.0");
+    }
+
+    #[tokio::test]
+    async fn pull_streams_progress_and_surfaces_error_lines() {
+        let body = concat!(
+            "{\"status\":\"pulling\",\"digest\":\"sha256:abc\",\"total\":100,\"completed\":40}\n",
+            "{\"status\":\"error\",\"error\":\"pull model manifest: file does not exist\"}\n",
+        );
+        let port = serve_once(200, body).await;
+        let c = OllamaClient::new(format!("http://127.0.0.1:{port}"));
+        let mut events = Vec::new();
+        let err = c
+            .pull("nope:latest", |p| events.push(p))
+            .await
+            .unwrap_err();
+        // the error line itself is not delivered as progress
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].completed, Some(40));
+        match err {
+            OllamaError::Http { status, message } => {
+                assert_eq!(status, 500);
+                assert!(message.contains("file does not exist"));
+            }
+            other => panic!("expected Http error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn pull_success_walks_progress_to_completion() {
+        let body = concat!(
+            "{\"status\":\"pulling\",\"total\":100,\"completed\":50}\n",
+            "{\"status\":\"success\"}\n",
+        );
+        let port = serve_once(200, body).await;
+        let c = OllamaClient::new(format!("http://127.0.0.1:{port}"));
+        let mut statuses = Vec::new();
+        c.pull("m", |p| statuses.push(p.status)).await.unwrap();
+        assert_eq!(statuses, vec!["pulling".to_string(), "success".to_string()]);
+    }
 }

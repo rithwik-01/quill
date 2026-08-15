@@ -101,3 +101,50 @@ pub fn load_settings_snapshot(app: &tauri::AppHandle) -> Settings {
 pub fn save_settings_snapshot(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
     save_to_store(app, settings)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The frontend (src/bindings.ts, src/stores/settingsStore.ts) consumes
+    /// this exact JSON shape — pin the camelCase contract.
+    #[test]
+    fn serializes_with_camel_case_keys() {
+        let v = serde_json::to_value(Settings::default()).unwrap();
+        let obj = v.as_object().unwrap();
+        for key in ["model", "hotkey", "launchAtLogin", "theme", "onboardingComplete"] {
+            assert!(obj.contains_key(key), "missing key: {key}");
+        }
+        assert!(!obj.contains_key("launch_at_login"));
+        assert!(!obj.contains_key("onboarding_complete"));
+    }
+
+    #[test]
+    fn defaults_match_frontend_contract() {
+        let s = Settings::default();
+        assert_eq!(s.model, "qwen3.5:4b");
+        assert_eq!(s.hotkey, crate::shortcut::DEFAULT_HOTKEY);
+        assert!(!s.launch_at_login);
+        assert_eq!(s.theme, Theme::System);
+        assert!(!s.onboarding_complete);
+    }
+
+    #[test]
+    fn legacy_payload_without_onboarding_flag_still_loads() {
+        // settings.json written before onboarding_complete existed
+        let s: Settings = serde_json::from_str(
+            r#"{"model":"qwen3.5:2b","hotkey":"CommandOrControl+Shift+Period","launchAtLogin":true,"theme":"dark"}"#,
+        )
+        .unwrap();
+        assert!(!s.onboarding_complete);
+        assert_eq!(s.theme, Theme::Dark);
+        assert_eq!(s.model, "qwen3.5:2b");
+    }
+
+    #[test]
+    fn theme_serializes_lowercase() {
+        assert_eq!(serde_json::to_value(Theme::System).unwrap(), "system");
+        assert_eq!(serde_json::to_value(Theme::Light).unwrap(), "light");
+        assert_eq!(serde_json::to_value(Theme::Dark).unwrap(), "dark");
+    }
+}

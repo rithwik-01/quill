@@ -322,3 +322,30 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::actions::Action;
+
+    #[test]
+    fn parse_action_accepts_all_frontend_spellings() {
+        // The popup historically sent PascalCase; the current UI sends snake_case.
+        assert_eq!(parse_action("fix_grammar").unwrap(), Action::FixGrammar);
+        assert_eq!(parse_action("FixGrammar").unwrap(), Action::FixGrammar);
+        assert_eq!(parse_action("fixGrammar").unwrap(), Action::FixGrammar);
+        assert_eq!(parse_action("improve").unwrap(), Action::Improve);
+        assert_eq!(parse_action("Improve").unwrap(), Action::Improve);
+        assert_eq!(parse_action("shorten").unwrap(), Action::Shorten);
+        assert_eq!(parse_action("Shorten").unwrap(), Action::Shorten);
+        assert_eq!(parse_action("simplify").unwrap(), Action::Simplify);
+        assert_eq!(parse_action("Simplify").unwrap(), Action::Simplify);
+    }
+
+    #[test]
+    fn parse_action_rejects_unknown_actions() {
+        let err = parse_action("summarize").unwrap_err();
+        assert!(err.contains("unknown action"));
+        assert!(err.contains("summarize"));
+    }
+}

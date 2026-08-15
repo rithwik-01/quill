@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # macOS runner: the Rust side links macOS-only frameworks (objc2,
+    # Accessibility FFI), so the suite must compile on darwin.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun test
+      - run: bun run build
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo test
+        working-directory: src-tauri

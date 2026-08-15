@@ -268,6 +268,7 @@ fn _ensure_types() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ollama::OllamaError;
     #[test]
     fn normalize_dot_to_period() {
         assert_eq!(normalize_hotkey("CommandOrControl+Shift+."), "CommandOrControl+Shift+Period");
@@ -278,5 +279,58 @@ mod tests {
     #[test]
     fn normalize_modifiers() {
         assert_eq!(normalize_hotkey("ctrl+shift+a"), "Control+Shift+A");
+    }
+    /// Parity table mirrored by src/stores/settingsStore.test.ts — the TS
+    /// `normalizeHotkey` must produce the same outputs for these inputs.
+    #[test]
+    fn normalize_parity_with_frontend() {
+        let cases: &[(&str, &str)] = &[
+            ("CmdOrCtrl+Shift+.", "CommandOrControl+Shift+Period"),
+            ("CommandOrControl+Shift+.", "CommandOrControl+Shift+Period"),
+            ("Ctrl+Shift+.", "Control+Shift+Period"),
+            ("Cmd+Shift+.", "Command+Shift+Period"),
+            ("CommandOrControl + Shift + .", "CommandOrControl+Shift+Period"),
+            ("CommandOrControl+Shift+period", "CommandOrControl+Shift+Period"),
+            ("cmdorctrl+shift+period", "CommandOrControl+Shift+Period"),
+            ("CommandOrControl+Shift+,", "CommandOrControl+Shift+Comma"),
+        ];
+        for (input, want) in cases {
+            assert_eq!(normalize_hotkey(input), *want, "input: {input}");
+        }
+        assert_eq!(normalize_hotkey(""), DEFAULT_HOTKEY);
+        assert_eq!(normalize_hotkey("   "), DEFAULT_HOTKEY);
+    }
+    #[test]
+    fn friendly_errors_are_user_actionable() {
+        let not_running = friendly_chat_error(&OllamaError::NotRunning {
+            message: "connection refused".into(),
+        });
+        assert!(not_running.starts_with("Couldn't start the local AI engine"));
+        assert!(not_running.contains("connection refused"));
+
+        let missing = friendly_chat_error(&OllamaError::ModelNotFound {
+            model: "qwen3.5:4b".into(),
+        });
+        assert!(missing.contains("qwen3.5:4b"));
+        assert!(missing.contains("isn't downloaded"));
+
+        assert_eq!(
+            friendly_chat_error(&OllamaError::Timeout { message: "x".into() }),
+            "This is taking too long. Try again or pick a smaller model."
+        );
+        assert_eq!(
+            friendly_chat_error(&OllamaError::EmptyResponse { message: "x".into() }),
+            "No result — try again."
+        );
+        // non-specialized variants fall through to the Display impl
+        let http = friendly_chat_error(&OllamaError::Http {
+            status: 500,
+            message: "boom".into(),
+        });
+        assert!(http.contains("500"));
+        let transport = friendly_chat_error(&OllamaError::Transport {
+            message: "dns failed".into(),
+        });
+        assert!(transport.contains("dns failed"));
     }
 }

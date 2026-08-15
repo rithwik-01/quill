@@ -359,4 +359,25 @@ mod tests {
         );
         cleanup(&dir);
     }
+
+    #[test]
+    fn malformed_refinements_json_degrades_to_empty() {
+        // A hand-edited or half-written DB row must not break the history tab;
+        // row_to_entry falls back to [] instead of erroring the whole page.
+        let (m, dir) = tmp_manager();
+        let path = dir.join("history.db");
+        m.save_entry("fix_grammar", "m", "orig", "res", &[]).unwrap();
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute(
+                "UPDATE rewrite_history SET refinements = 'not-json' WHERE original_text = 'orig'",
+                [],
+            )
+            .unwrap();
+        }
+        let page = m.get_entries(None, Some(10)).unwrap();
+        assert_eq!(page.entries.len(), 1);
+        assert!(page.entries[0].refinements.is_empty());
+        cleanup(&dir);
+    }
 }

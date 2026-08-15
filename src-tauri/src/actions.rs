@@ -231,4 +231,23 @@ mod tests {
         assert_eq!(strip_preamble("Here is the corrected text:\nThis is line one.\nThis is line two."), "This is line one.\nThis is line two.");
         assert_eq!(strip_preamble("Here is the corrected text:\n```\n\"\"\n```"), "");
     }
+    /// actions.rs and ollama.rs each define the /api/chat wire types; this
+    /// pins them to the same serialized shape so they can't drift silently.
+    #[test] fn wire_shape_matches_ollama_client() {
+        use std::collections::BTreeSet;
+        let a = serde_json::to_value(build_chat_request("m", Action::Improve, "t")).unwrap();
+        let o = serde_json::to_value(
+            crate::ollama::OllamaClient::default_local().chat_body("m", IMPROVE_PROMPT, "t"),
+        )
+        .unwrap();
+        let keys = |v: &serde_json::Value| -> BTreeSet<String> {
+            v.as_object().unwrap().keys().cloned().collect()
+        };
+        assert_eq!(keys(&a), keys(&o));
+        assert_eq!(a["stream"], o["stream"]);
+        assert_eq!(a["think"], o["think"]);
+        assert_eq!(a["options"], o["options"]);
+        assert_eq!(a["messages"][0]["role"], o["messages"][0]["role"]);
+        assert_eq!(a["messages"][0]["content"], o["messages"][0]["content"]);
+    }
 }
