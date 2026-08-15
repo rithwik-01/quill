@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { commands } from "../bindings";
+import { DiffText } from "./DiffText";
 
 // Canonical action ids accepted by Rust parse_action (commands.rs)
 const ACTIONS = [
@@ -253,10 +254,8 @@ export function Popup() {
 
           {phase === "result" && (
             <div className="space-y-2">
-              {/* corrected result */}
-              <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-100">
-                {result}
-              </p>
+              {/* corrected result — inline diff vs original */}
+              <DiffText original={original} result={result} />
 
               {/* applied refinements */}
               {refinements.length > 0 && (
