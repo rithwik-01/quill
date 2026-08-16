@@ -7,6 +7,7 @@
 <p align="center">
   A local-first writing assistant for macOS and Windows. Select text in any app, press a hotkey, and a small popup shows the corrected version — refine it via chat, then accept to paste it back.<br/>Everything runs on your machine through <a href="https://ollama.com">Ollama</a>; no cloud, no API keys.
 </p>
+<img width="1554" height="870" alt="image" src="https://github.com/user-attachments/assets/c227b7f5-57af-4f42-8f9a-072197054ecf" />
 
 ## Features
 
